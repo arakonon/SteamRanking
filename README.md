@@ -2,6 +2,8 @@
 
 Flask/SQLite-Webapp, die Spielzeiten einer festen Steam-Freundesgruppe per Steam Web API snapshotted und als Wochen-/Monats-/Jahresleaderboard darstellt. Optional: automatisch generierte Instagram-Posts/-Stories mit Bildern und Captions.
 
+> temp. bsp: https://steamranking.pythonanywhere.com/leaderboard?period=week
+
 ## Features
 
 - Periodische Snapshots der Spielzeiten via Steam Web API
