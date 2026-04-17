@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Rangliste – {{ "Woche" if period == "week" else ("Monat" if period == "month" else ("Jahr" if period == "year" else "Allzeit")) }}{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <!-- Header + Periode-Toggle -->
+  <div class="flex items-center justify-between flex-wrap gap-4">
+    <h1 class="text-3xl font-bold text-white">Rangliste</h1>
+    <div class="flex gap-2">
+      <a href="/leaderboard?period=week"
+         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                {{ 'bg-blue-600 text-white' if period == 'week' else 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">
+        7 Tage
+      </a>
+      <a href="/leaderboard?period=month"
+         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                {{ 'bg-blue-600 text-white' if period == 'month' else 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">
+        30 Tage
+      </a>
+      <a href="/leaderboard?period=year"
+         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                {{ 'bg-yellow-600 text-white' if period == 'year' else 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">
+        365 Tage
+      </a>
+      <a href="/leaderboard?period=ever"
+         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                {{ 'bg-purple-600 text-white' if period == 'ever' else 'bg-gray-700 text-gray-300 hover:bg-gray-600' }}">
+        Allzeit
+      </a>
+    </div>
+  </div>
+
+  {% macro empty_state() %}
+  <tr><td colspan="10" class="py-6 text-center text-gray-500 italic">Noch keine Daten – Snapshot auslösen unter /api/snapshot</td></tr>
+  {% endmacro %}
+
+  <!-- 1. Gesamte Spielzeit -->
+  <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold">🏆 Meiste Spielzeit</h2>
+      <p class="text-gray-400 text-sm">{{ "Kumulierte Gesamtspielzeit aller Zeiten" if period == "ever" else "Spielzeit-Zunahme in den letzten " ~ days ~ " Tagen" }}</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-750 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3 text-left">#</th>
+            <th class="px-6 py-3 text-left">Spieler</th>
+            <th class="px-6 py-3 text-right">Stunden</th>
+            <th class="px-6 py-3 text-right">Tage</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          {% for row in data.total_playtime %}
+          <tr class="hover:bg-gray-750 transition-colors">
+            <td class="px-6 py-3 text-gray-400">{{ loop.index }}</td>
+            <td class="px-6 py-3 flex items-center gap-3">
+              {% if row.avatar_url %}
+              <img src="{{ row.avatar_url }}" alt="" class="w-7 h-7 rounded-full" />
+              {% endif %}
+              {{ row.player }}
+            </td>
+            <td class="px-6 py-3 text-right tabular-nums text-blue-400 font-medium">
+              {{ "%.1f"|format(row.total_minutes_gained / 60) }}h
+            </td>
+            <td class="px-6 py-3 text-right tabular-nums text-gray-400">
+              {{ "%.2f"|format(row.total_minutes_gained / 60 / 24) }}d
+            </td>
+          </tr>
+          {% else %}{{ empty_state() }}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 2. Meistgespieltes Spiel (gesamt) -->
+  <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold">🎯 Meistgespieltes Spiel (alle Spieler)</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-750 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3 text-left">#</th>
+            <th class="px-6 py-3 text-left">Spiel</th>
+            <th class="px-6 py-3 text-right">Stunden</th>
+            <th class="px-6 py-3 text-right">Tage</th>
+            <th class="px-6 py-3 text-right">Spieler</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          {% for row in data.most_played_overall %}
+          <tr class="hover:bg-gray-750 transition-colors">
+            <td class="px-6 py-3 text-gray-400">{{ loop.index }}</td>
+            <td class="px-6 py-3 font-medium">{{ row.game_name }}</td>
+            <td class="px-6 py-3 text-right tabular-nums text-blue-400 font-medium">
+              {{ "%.1f"|format(row.total_minutes / 60) }}h
+            </td>
+            <td class="px-6 py-3 text-right tabular-nums text-gray-400">
+              {{ "%.2f"|format(row.total_minutes / 60 / 24) }}d
+            </td>
+            <td class="px-6 py-3 text-right text-gray-400">{{ row.player_count }}</td>
+          </tr>
+          {% else %}{{ empty_state() }}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 3. Meistgespieltes Spiel pro Spieler -->
+  <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold">🎮 Lieblingsspiel pro Spieler</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-750 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3 text-left">Spieler</th>
+            <th class="px-6 py-3 text-left">Spiel</th>
+            <th class="px-6 py-3 text-right">Stunden</th>
+            <th class="px-6 py-3 text-right">Tage</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          {% for row in data.most_played_per_player %}
+          <tr class="hover:bg-gray-750 transition-colors">
+            <td class="px-6 py-3 font-medium">{{ row.player }}</td>
+            <td class="px-6 py-3 text-gray-300">{{ row.game_name }}</td>
+            <td class="px-6 py-3 text-right tabular-nums text-blue-400 font-medium">
+              {{ "%.1f"|format(row.minutes / 60) }}h
+            </td>
+            <td class="px-6 py-3 text-right tabular-nums text-gray-400">
+              {{ "%.2f"|format(row.minutes / 60 / 24) }}d
+            </td>
+          </tr>
+          {% else %}{{ empty_state() }}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 6. Durchschnittliche Spielzeit pro Spiel -->
+  <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold">📊 Ø Spielzeit pro Spiel</h2>
+      <p class="text-gray-400 text-sm">Durchschnittliche Minuten pro gespieltem Spiel</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-750 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3 text-left">#</th>
+            <th class="px-6 py-3 text-left">Spieler</th>
+            <th class="px-6 py-3 text-right">Ø Stunden/Spiel</th>
+            <th class="px-6 py-3 text-right">Ø Tage/Spiel</th>
+            <th class="px-6 py-3 text-right">Spiele gespielt</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          {% for row in data.avg_playtime %}
+          <tr class="hover:bg-gray-750 transition-colors">
+            <td class="px-6 py-3 text-gray-400">{{ loop.index }}</td>
+            <td class="px-6 py-3 font-medium">{{ row.player }}</td>
+            <td class="px-6 py-3 text-right tabular-nums text-blue-400 font-medium">
+              {{ "%.1f"|format(row.avg_minutes_per_game / 60) }}h
+            </td>
+            <td class="px-6 py-3 text-right tabular-nums text-gray-400">
+              {{ "%.2f"|format(row.avg_minutes_per_game / 60 / 24) }}d
+            </td>
+            <td class="px-6 py-3 text-right text-gray-400">{{ row.games_played }}</td>
+          </tr>
+          {% else %}{{ empty_state() }}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 4. Meiste Spiele in der Bibliothek
+  <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold">📚 Größte Spielebibliothek</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-750 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3 text-left">#</th>
+            <th class="px-6 py-3 text-left">Spieler</th>
+            <th class="px-6 py-3 text-right">Spiele</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          {% for row in data.most_games %}
+          <tr class="hover:bg-gray-750 transition-colors">
+            <td class="px-6 py-3 text-gray-400">{{ loop.index }}</td>
+            <td class="px-6 py-3 flex items-center gap-3">
+              {% if row.avatar_url %}
+              <img src="{{ row.avatar_url }}" alt="" class="w-7 h-7 rounded-full" />
+              {% endif %}
+              {{ row.player }}
+            </td>
+            <td class="px-6 py-3 text-right tabular-nums font-medium">{{ row.game_count }}</td>
+          </tr>
+          {% else %}{{ empty_state() }}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div> -->
+
+  <!-- 5. Zuletzt gespielt
+  <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-semibold">🕐 Zuletzt gespielt</h2>
+      <p class="text-gray-400 text-sm">{{ "Alle je gespielten Spiele (neueste 100)" if period == "ever" else "Spiele die in den letzten " ~ days ~ " Tagen gespielt wurden" }}</p>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-750 text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-6 py-3 text-left">Spieler</th>
+            <th class="px-6 py-3 text-left">Spiel</th>
+            <th class="px-6 py-3 text-right">Zuletzt gespielt</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+          {% for row in data.recently_played %}
+          <tr class="hover:bg-gray-750 transition-colors">
+            <td class="px-6 py-3 font-medium">{{ row.player }}</td>
+            <td class="px-6 py-3 text-gray-300">{{ row.game_name }}</td>
+            <td class="px-6 py-3 text-right text-gray-400">{{ row.last_played_str }}</td>
+          </tr>
+          {% else %}{{ empty_state() }}{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div> -->
+
+
+
+</div>
+{% endblock %}

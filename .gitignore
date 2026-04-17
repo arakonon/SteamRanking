@@ -1,0 +1,36 @@
+# Secrets & lokale Konfiguration
+.steamsecrets
+.secrets/
+players.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Datenbank
+*.db
+*.db-journal
+steam-leaderboard/database/steam_leaderboard.db
+
+# IDE / Tooling
+.vscode/
+.idea/
+.DS_Store
+.claude/
+.claudeignore
+
+# PythonAnywhere-Home-Leftovers (nicht Teil des Projekts)
+.bash_history
+.bashrc
+.profile
+.pythonstartup.py
+.vimrc
+.gitconfig
+.cache/
+.local/
+.ipython/
+.virtualenvs/
+README.txt

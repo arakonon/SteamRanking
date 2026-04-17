@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Steam Leaderboard – Übersicht{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+  <div>
+    <h1 class="text-3xl font-bold text-white mb-2">Steam Leaderboard</h1>
+    <p class="text-gray-400">Wer spielt am meisten.</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <a href="/leaderboard?period=week"
+       class="block bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition-colors">
+      <div class="text-blue-400 text-2xl mb-2">📅</div>
+      <h2 class="text-lg font-semibold mb-1">Diese Woche</h2>
+      <p class="text-gray-400 text-sm">Ranglisten der letzten 7 Tage</p>
+    </a>
+    <a href="/leaderboard?period=month"
+       class="block bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-blue-500 transition-colors">
+      <div class="text-blue-400 text-2xl mb-2">📆</div>
+      <h2 class="text-lg font-semibold mb-1">Dieser Monat</h2>
+      <p class="text-gray-400 text-sm">Ranglisten der letzten 30 Tage</p>
+    </a>
+    <a href="/leaderboard?period=year"
+       class="block bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-yellow-500 transition-colors">
+      <div class="text-yellow-400 text-2xl mb-2">🏆</div>
+      <h2 class="text-lg font-semibold mb-1">Dieses Jahr</h2>
+      <p class="text-gray-400 text-sm">Ranglisten der letzten 365 Tage</p>
+    </a>
+  </div>
+
+  <div class="bg-gray-800 rounded-xl p-6 border border-gray-700">
+    <h2 class="text-lg font-semibold mb-3">API-Endpunkte</h2>
+    <ul class="space-y-2 text-sm font-mono">
+      <li>
+        <a href="/api/snapshot" class="text-green-400 hover:underline">GET /api/snapshot</a>
+        <span class="text-gray-400 ml-2">— Snapshot aller Spieler auslösen</span>
+      </li>
+      <li>
+        <a href="/api/rankings?period=week" class="text-green-400 hover:underline">GET /api/rankings?period=week|month</a>
+        <span class="text-gray-400 ml-2">— Rankings als JSON</span>
+      </li>
+    </ul>
+  </div>
+
+</div>
+{% endblock %}
