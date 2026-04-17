@@ -99,6 +99,3 @@ steam-leaderboard/
     └── captions.py       # Caption-Texte
 ```
 
-## Lizenz
-
-MIT — siehe `LICENSE` (falls vorhanden).
