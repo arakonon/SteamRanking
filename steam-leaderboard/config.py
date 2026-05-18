@@ -44,3 +44,6 @@ BASE_URL = "https://api.steampowered.com"
 
 INSTAGRAM_USER = os.environ.get("INSTAGRAM_USER", "")
 INSTAGRAM_PASS = os.environ.get("INSTAGRAM_PASS", "")
+
+# Steam App-IDs, die komplett ignoriert werden (kein Tracking, kein Ranking)
+EXCLUDED_APP_IDS = (3419430,)  # Bongo Cat

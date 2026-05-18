@@ -55,6 +55,9 @@ def run_snapshot():
             detail["reason"] = owned.get("reason", "")
 
             games = owned.get("games", [])
+            if config.EXCLUDED_APP_IDS:
+                _excl = set(config.EXCLUDED_APP_IDS)
+                games = [g for g in games if g["appid"] not in _excl]
             if detail["owned_games_status"] == "private_or_hidden":
                 private_accounts += 1
             elif detail["owned_games_status"] == "public_no_games":

@@ -51,6 +51,8 @@ Secrets werden aus `~/.steamsecrets` geladen (key=value Format). Vorlage: `.stea
 
 Steam-IDs werden aus `steam-leaderboard/players.json` geladen (gitignored). Vorlage: `players.example.json`.
 
+`EXCLUDED_APP_IDS` in `config.py` ist ein Tuple mit Steam App-IDs, die komplett ignoriert werden – weder in Snapshots gespeichert noch in irgendeiner Rangliste angezeigt. Aktuell ausgeschlossen: `3419430` (Bongo Cat). Neue Spiele dort einfach ergänzen.
+
 ## Deployment
 
 Ziel: PythonAnywhere. DB-Pfad wird ueber die Env-Var `DB_PATH` gesetzt (Fallback: lokaler Pfad in `steam-leaderboard/database/`).
