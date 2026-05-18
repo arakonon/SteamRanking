@@ -48,10 +48,11 @@ Secrets werden aus `~/.steamsecrets` geladen (key=value Format). Vorlage: `.stea
 - `SNAPSHOT_TOKEN` (API-Auth)
 - `DB_PATH` (optional, absoluter Pfad)
 - `PROJECT_DIR` (optional, fuer `run_snapshot.py` aus Cronjobs)
+- `EXCLUDED_APP_IDS` in `config.py` ist ein Tuple mit Steam App-IDs, die komplett ignoriert werden – weder in Snapshots gespeichert noch in irgendeiner Rangliste angezeigt.
 
 Steam-IDs werden aus `steam-leaderboard/players.json` geladen (gitignored). Vorlage: `players.example.json`.
 
-`EXCLUDED_APP_IDS` in `config.py` ist ein Tuple mit Steam App-IDs, die komplett ignoriert werden – weder in Snapshots gespeichert noch in irgendeiner Rangliste angezeigt. Aktuell ausgeschlossen: `3419430` (Bongo Cat). Neue Spiele dort einfach ergänzen.
+
 
 ## Deployment
 
