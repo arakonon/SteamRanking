@@ -17,6 +17,8 @@ with app.app_context():
 
 
 def _days_from_period(period):
+    if period == "day":
+        return 1
     if period == "month":
         return 30
     if period == "year":
