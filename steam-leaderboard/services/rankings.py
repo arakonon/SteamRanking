@@ -17,6 +17,54 @@ def _excl(alias=''):
     return f' AND {col} NOT IN ({ph})', tuple(ids)
 
 
+def _gains_cte(since):
+    """Returns (WITH-clause, params) defining `gains(player_id, game_id, game_name, minutes)`:
+    Spielzeit-Zunahme pro Spieler+Spiel seit `since`.
+    Baseline ist der letzte Snapshot vor dem Fenster. Gibt es keinen, zählt ein Spiel,
+    das erst nach dem ersten Snapshot des Spielers aufgetaucht ist (neu gekauft/gespielt),
+    ab 0 – sonst ab dem ältesten Snapshot im Fenster (neu getrackter Spieler)."""
+    excl_sql, excl_p = _excl()
+    sql = f"""
+        WITH player_first AS (
+            SELECT player_id, MIN(timestamp) AS first_ts
+            FROM snapshots
+            GROUP BY player_id
+        ),
+        game_first AS (
+            SELECT player_id, game_id, MIN(timestamp) AS first_ts
+            FROM snapshots
+            WHERE 1=1{excl_sql}
+            GROUP BY player_id, game_id
+        ),
+        win AS (
+            SELECT player_id, game_id, MAX(game_name) AS game_name,
+                   MAX(playtime_minutes) AS newest,
+                   MIN(playtime_minutes) AS oldest
+            FROM snapshots
+            WHERE timestamp >= ?{excl_sql}
+            GROUP BY player_id, game_id
+        ),
+        before AS (
+            SELECT player_id, game_id, MAX(playtime_minutes) AS playtime_minutes
+            FROM snapshots
+            WHERE timestamp < ?{excl_sql}
+            GROUP BY player_id, game_id
+        ),
+        gains AS (
+            SELECT w.player_id, w.game_id, w.game_name,
+                   w.newest - COALESCE(
+                       b.playtime_minutes,
+                       CASE WHEN gf.first_ts > pf.first_ts THEN 0 ELSE w.oldest END
+                   ) AS minutes
+            FROM win w
+            JOIN game_first gf ON gf.player_id = w.player_id AND gf.game_id = w.game_id
+            JOIN player_first pf ON pf.player_id = w.player_id
+            LEFT JOIN before b ON b.player_id = w.player_id AND b.game_id = w.game_id
+        )
+    """
+    return sql, (*excl_p, since, *excl_p, since, *excl_p)
+
+
 def get_total_playtime_ranking(days):
     """Gesamte Spielzeit pro Spieler.
     days=None → kumulativ (neuester Snapshot), sonst Zunahme im Zeitfenster."""
@@ -41,35 +89,21 @@ def get_total_playtime_ranking(days):
         with get_connection() as conn:
             rows = conn.execute(query, excl_p).fetchall()
     else:
-        since = _window_start(days)
-        query = f"""
+        cte, cte_p = _gains_cte(_window_start(days))
+        query = cte + """
             SELECT
                 p.display_name AS player,
                 p.steam_id,
                 p.avatar_url,
-                SUM(newest.playtime_minutes - oldest.playtime_minutes) AS total_minutes_gained
+                SUM(g.minutes) AS total_minutes_gained
             FROM players p
-            JOIN (
-                SELECT player_id, game_id,
-                       MAX(playtime_minutes) AS playtime_minutes
-                FROM snapshots
-                WHERE timestamp >= ?{excl_sql}
-                GROUP BY player_id, game_id
-            ) newest ON newest.player_id = p.id
-            JOIN (
-                SELECT player_id, game_id,
-                       MIN(playtime_minutes) AS playtime_minutes
-                FROM snapshots
-                WHERE timestamp >= ?{excl_sql}
-                GROUP BY player_id, game_id
-            ) oldest ON oldest.player_id = newest.player_id
-                     AND oldest.game_id  = newest.game_id
+            JOIN gains g ON g.player_id = p.id
             GROUP BY p.id
             HAVING total_minutes_gained > 0
             ORDER BY total_minutes_gained DESC
         """
         with get_connection() as conn:
-            rows = conn.execute(query, (since, *excl_p, since, *excl_p)).fetchall()
+            rows = conn.execute(query, cte_p).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -98,34 +132,20 @@ def get_most_played_game_overall(days):
         with get_connection() as conn:
             rows = conn.execute(query, excl_p).fetchall()
     else:
-        since = _window_start(days)
-        query = f"""
+        cte, cte_p = _gains_cte(_window_start(days))
+        query = cte + """
             SELECT
-                newest.game_name,
-                SUM(newest.playtime_minutes - oldest.playtime_minutes) AS total_minutes,
-                COUNT(DISTINCT newest.player_id) AS player_count
-            FROM (
-                SELECT player_id, game_id, game_name,
-                       MAX(playtime_minutes) AS playtime_minutes
-                FROM snapshots
-                WHERE timestamp >= ?{excl_sql}
-                GROUP BY player_id, game_id
-            ) newest
-            JOIN (
-                SELECT player_id, game_id,
-                       MIN(playtime_minutes) AS playtime_minutes
-                FROM snapshots
-                WHERE timestamp >= ?{excl_sql}
-                GROUP BY player_id, game_id
-            ) oldest ON oldest.player_id = newest.player_id
-                     AND oldest.game_id  = newest.game_id
-            WHERE newest.playtime_minutes - oldest.playtime_minutes > 0
-            GROUP BY newest.game_name
+                game_name,
+                SUM(minutes) AS total_minutes,
+                COUNT(DISTINCT player_id) AS player_count
+            FROM gains
+            WHERE minutes > 0
+            GROUP BY game_name
             ORDER BY total_minutes DESC
             LIMIT 10
         """
         with get_connection() as conn:
-            rows = conn.execute(query, (since, *excl_p, since, *excl_p)).fetchall()
+            rows = conn.execute(query, cte_p).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -161,67 +181,23 @@ def get_most_played_game_per_player(days):
         with get_connection() as conn:
             rows = conn.execute(query, (*excl_p, *excl_p)).fetchall()
     else:
-        since = _window_start(days)
-        query = f"""
+        cte, cte_p = _gains_cte(_window_start(days))
+        query = cte + """
             SELECT
                 p.display_name AS player,
                 p.steam_id,
-                sub.game_name,
-                sub.minutes AS minutes
+                g.game_name,
+                g.minutes AS minutes
             FROM players p
-            JOIN (
-                SELECT
-                    newest.player_id,
-                    newest.game_name,
-                    (newest.playtime_minutes - oldest.playtime_minutes) AS minutes
-                FROM (
-                    SELECT player_id, game_id, game_name,
-                           MAX(playtime_minutes) AS playtime_minutes
-                    FROM snapshots
-                    WHERE timestamp >= ?{excl_sql}
-                    GROUP BY player_id, game_id
-                ) newest
-                JOIN (
-                    SELECT player_id, game_id,
-                           MIN(playtime_minutes) AS playtime_minutes
-                    FROM snapshots
-                    WHERE timestamp >= ?{excl_sql}
-                    GROUP BY player_id, game_id
-                ) oldest ON oldest.player_id = newest.player_id
-                         AND oldest.game_id  = newest.game_id
-                WHERE newest.playtime_minutes - oldest.playtime_minutes > 0
-            ) sub ON sub.player_id = p.id
-            WHERE sub.minutes = (
-                SELECT MAX(inner_sub.minutes)
-                FROM (
-                    SELECT
-                        newest2.player_id,
-                        (newest2.playtime_minutes - oldest2.playtime_minutes) AS minutes
-                    FROM (
-                        SELECT player_id, game_id,
-                               MAX(playtime_minutes) AS playtime_minutes
-                        FROM snapshots
-                        WHERE timestamp >= ?{excl_sql}
-                        GROUP BY player_id, game_id
-                    ) newest2
-                    JOIN (
-                        SELECT player_id, game_id,
-                               MIN(playtime_minutes) AS playtime_minutes
-                        FROM snapshots
-                        WHERE timestamp >= ?{excl_sql}
-                        GROUP BY player_id, game_id
-                    ) oldest2 ON oldest2.player_id = newest2.player_id
-                              AND oldest2.game_id  = newest2.game_id
-                ) inner_sub
-                WHERE inner_sub.player_id = p.id
+            JOIN gains g ON g.player_id = p.id
+            WHERE g.minutes > 0
+              AND g.minutes = (
+                SELECT MAX(g2.minutes) FROM gains g2 WHERE g2.player_id = p.id
             )
-            ORDER BY sub.minutes DESC
+            ORDER BY g.minutes DESC
         """
         with get_connection() as conn:
-            rows = conn.execute(
-                query,
-                (since, *excl_p, since, *excl_p, since, *excl_p, since, *excl_p),
-            ).fetchall()
+            rows = conn.execute(query, cte_p).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -319,37 +295,19 @@ def get_avg_playtime_per_game(days):
         with get_connection() as conn:
             rows = conn.execute(query, excl_p).fetchall()
     else:
-        since = _window_start(days)
-        query = f"""
+        cte, cte_p = _gains_cte(_window_start(days))
+        query = cte + """
             SELECT
                 p.display_name AS player,
                 p.steam_id,
-                ROUND(
-                    CAST(SUM(newest.playtime_minutes - oldest.playtime_minutes) AS REAL)
-                    / COUNT(*),
-                    1
-                ) AS avg_minutes_per_game,
+                ROUND(CAST(SUM(g.minutes) AS REAL) / COUNT(*), 1) AS avg_minutes_per_game,
                 COUNT(*) AS games_played
             FROM players p
-            JOIN (
-                SELECT player_id, game_id,
-                       MAX(playtime_minutes) AS playtime_minutes
-                FROM snapshots
-                WHERE timestamp >= ?{excl_sql}
-                GROUP BY player_id, game_id
-            ) newest ON newest.player_id = p.id
-            JOIN (
-                SELECT player_id, game_id,
-                       MIN(playtime_minutes) AS playtime_minutes
-                FROM snapshots
-                WHERE timestamp >= ?{excl_sql}
-                GROUP BY player_id, game_id
-            ) oldest ON oldest.player_id = newest.player_id
-                     AND oldest.game_id  = newest.game_id
-            WHERE newest.playtime_minutes - oldest.playtime_minutes > 0
+            JOIN gains g ON g.player_id = p.id
+            WHERE g.minutes > 0
             GROUP BY p.id
             ORDER BY avg_minutes_per_game DESC
         """
         with get_connection() as conn:
-            rows = conn.execute(query, (since, *excl_p, since, *excl_p)).fetchall()
+            rows = conn.execute(query, cte_p).fetchall()
     return [dict(r) for r in rows]
